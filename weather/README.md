@@ -1,4 +1,4 @@
-# A  Flet app
+# A weather Flet app
 
 An example of a minimal Flet app.
 
