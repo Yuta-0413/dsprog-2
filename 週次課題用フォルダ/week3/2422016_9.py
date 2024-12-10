@@ -4,4 +4,4 @@ import pandas as pd
 df = pd.read_csv('Wine Quality Red.csv', sep=',')
 
 #qualityの値ごとにカテゴリーごとの平均を表示
-print(df.groupby("quality").mean())
+df.groupby("quality").mean()

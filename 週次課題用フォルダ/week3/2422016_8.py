@@ -4,4 +4,4 @@ import pandas as pd
 df = pd.read_csv('Wine Quality Red.csv', sep=',')
 
 #quality列の値が6以上のデータをqualityの値が高い順に表示
-print(df[df["quality"] >= 6].sort_values("quality", ascending=False))
+df[df["quality"] >= 6].sort_values("quality", ascending=False)
