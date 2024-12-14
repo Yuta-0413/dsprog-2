@@ -3,7 +3,7 @@ import requests
 import csv
 from datetime import datetime
 
-# 地域リストを取得
+#地域リストを取得
 def get_area_list():
     try:
         response = requests.get("http://www.jma.go.jp/bosai/common/const/area.json")
@@ -12,7 +12,7 @@ def get_area_list():
     except Exception as e:
         raise Exception(f"地域リストの取得に失敗しました: {e}")
 
-# 地方ごとの地域IDのマッピング
+#地方ごとの地域IDのマッピング
 REGION_MAPPING = {
     "北海道地方": ["011000", "012000", "013000", "014000", "015000", "016000", "017000"],
     "東北地方": ["020000", "030000", "040000", "050000", "060000", "070000"],
@@ -27,7 +27,7 @@ REGION_MAPPING = {
     "沖縄地方": ["471000", "472000", "473000", "474000"],
 }
 
-# 地方分けに従ってデータを整理
+#地方分けに従ってデータを整理
 def group_by_region_fixed(area_data):
     regions = {region: [] for region in REGION_MAPPING.keys()}
     for area_id, area_info in area_data.items():
@@ -37,7 +37,7 @@ def group_by_region_fixed(area_data):
                 break
     return regions
 
-# 天気データを取得
+#天気データを取得
 def get_weather_data(area_id):
     try:
         response = requests.get(f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_id}.json")
@@ -46,7 +46,7 @@ def get_weather_data(area_id):
     except Exception as e:
         raise Exception(f"天気情報の取得に失敗しました: {e}")
 
-# 天気の内容に基づくアイコンと天気情報の簡潔な表現
+#天気の内容に基づくアイコンと天気情報の簡潔な表現
 def get_weather_icon(weather):
     if "晴" in weather:
         return ft.icons.WB_SUNNY, "晴"
@@ -57,36 +57,47 @@ def get_weather_icon(weather):
     elif "雪" in weather:
         return ft.icons.AC_UNIT, "雪"
     else:
-        return ft.icons.HELP_OUTLINE, "不明"  # 不明な天気用アイコン
+        return ft.icons.HELP_OUTLINE, "不明"
 
-# 天気データを解析
+#天気データを解析
 def parse_weather(weather_data):
     try:
         time_series = weather_data[0]["timeSeries"][0]
         weather_forecast = time_series["areas"][0]["weathers"]
         dates = time_series["timeDefines"]
-        # アイコンを追加してリストにする
+        #アイコンを追加してリストにする
         return [(date, weather, get_weather_icon(weather)) for date, weather in zip(dates, weather_forecast)]
     except (IndexError, KeyError) as e:
         return []
 
-# 天気データをCSVファイルに追記
+#CSVファイルをリセット
+def reset_csv():
+    try:
+        with open("個人課題3/weather.csv", mode="w", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["id", "地域名", "日付", "天気"])  # ヘッダーを再作成
+        print("weather.csv の内容をリセットしました。")
+    except Exception as e:
+        print(f"CSVファイルのリセットに失敗しました: {e}")
+
+#天気データをCSVファイルに追記
 def save_weather_to_csv(area_name, forecast):
     try:
-        with open("個人課題3/weather.csv", mode="a", encoding="utf-8", newline="") as file:
-            writer = csv.writer(file)
-            # 今日の日付
-            today = datetime.now().strftime("%Y-%m-%d")
-            # 通し番号を計算
-            try:
-                with open("weather.csv", mode="r", encoding="utf-8") as rfile:
-                    reader = csv.reader(rfile)
-                    last_row = list(reader)[-1]
-                    serial_number = int(last_row[0]) + 1 if last_row else 1
-            except (FileNotFoundError, IndexError):
-                serial_number = 1  # 初回の場合は1
+        csv_path = "個人課題3/weather.csv"
+        #通し番号を計算
+        try:
+            with open(csv_path, mode="r", encoding="utf-8") as rfile:
+                reader = csv.reader(rfile)
+                rows = list(reader)
+                serial_number = int(rows[-1][0]) + 1 if len(rows) > 1 else 1
+        except (FileNotFoundError, IndexError, ValueError):
+            serial_number = 1
 
-            # 天気データを記載（今日のデータのみ）
+        with open(csv_path, mode="a", encoding="utf-8", newline="") as file:
+            writer = csv.writer(file)
+            today = datetime.now().strftime("%Y-%m-%d")
+
+            #天気データを記載（今日のデータのみ）
             if forecast:
                 _, today_weather, (_, weather_desc) = forecast[0]
                 writer.writerow([serial_number, area_name, today, weather_desc])
@@ -94,34 +105,37 @@ def save_weather_to_csv(area_name, forecast):
     except Exception as e:
         print(f"CSVファイルへの保存に失敗しました: {e}")
 
-# ページのサイズを設定する関数
+#ページのサイズを設定する関数
 def set_page_size(page: ft.Page, width: int, height: int):
     page.window_width = width
     page.window_height = height
 
-# メインアプリケーション
+#メインアプリケーション
 def main(page: ft.Page):
     page.title = "簡易天気予報アプリ"
     page.scroll = "adaptive"
     set_page_size(page, width=1366, height=768)
 
-    # 地域データを取得
+    #CSVファイルをリセット
+    reset_csv()
+
+    #地域データを取得
     try:
         area_data = get_area_list()
     except Exception as e:
         page.add(ft.Text(f"地域データの取得に失敗しました: {e}", color="red"))
         return
 
-    # 地方ごとにデータを整理
+    #地方ごとにデータを整理
     grouped_areas = group_by_region_fixed(area_data)
 
-    # 地方リスト
+    #地方リスト
     region_names = list(grouped_areas.keys())
 
-    # 天気情報を表示するコンテナ
+    #天気情報を表示するコンテナ
     weather_container = ft.Column(scroll="adaptive")
 
-    # 天気予報を表示する関数
+    #天気予報を表示する関数
     def show_weather(area_id):
         weather_container.controls.clear()
         if not area_id:
@@ -129,15 +143,15 @@ def main(page: ft.Page):
             page.update()
             return
         try:
-            # 天気データを取得
+            #天気データを取得
             weather_data = get_weather_data(area_id)
             forecast = parse_weather(weather_data)
-            # 地域名
+            #地域名
             area_name = next(
                 (name for areas in grouped_areas.values() for id_, name in areas if id_ == area_id),
                 "不明"
             )
-            # 天気情報を表示
+            #天気情報を表示
             weather_container.controls.append(ft.Text(f"{area_name}の天気予報", style="headlineLarge", weight="bold"))
             if not forecast:
                 weather_container.controls.append(ft.Text("天気情報が見つかりません。", color="red"))
@@ -146,21 +160,21 @@ def main(page: ft.Page):
                     ft.ListTile(
                         title=ft.Text(date),
                         subtitle=ft.Text(weather),
-                        leading=ft.Icon(icon),  # 天気アイコンを追加
+                        leading=ft.Icon(icon),
                     )
                 )
-            # CSVに追記
+            #CSVに追記
             save_weather_to_csv(area_name, forecast)
         except Exception as e:
             weather_container.controls.append(ft.Text(f"天気情報の取得に失敗しました: {e}", color="red"))
         page.update()
 
-    # 地方を選択したときに表示される地域リストを作成する関数
+    #地方を選択したときに表示される地域リストを作成する関数
     def show_region_areas(selected_index):
         region_name = region_names[selected_index]
         areas = grouped_areas[region_name]
 
-        # 地域リストを作成
+        #地域リストを作成
         area_list = ft.Column(
             controls=[
                 ft.ListTile(
@@ -172,13 +186,13 @@ def main(page: ft.Page):
             spacing=10,
         )
 
-        # サイドバーの内容を更新
+        #サイドバーの内容を更新
         sidebar_content.controls.clear()
         sidebar_content.controls.append(ft.Text(f"{region_name}の地域一覧", style="headlineSmall", weight="bold"))
         sidebar_content.controls.append(area_list)
         page.update()
 
-    # NavigationRailの項目を作成
+    #NavigationRailの項目を作成
     nav_rail = ft.NavigationRail(
         selected_index=0,
         label_type=ft.NavigationRailLabelType.ALL,
@@ -193,24 +207,24 @@ def main(page: ft.Page):
         on_change=lambda e: show_region_areas(e.control.selected_index),
     )
 
-    # 初期の地域リスト
+    #初期の地域リスト
     sidebar_content = ft.Column()
 
-    # ページのレイアウト
+    #ページのレイアウト
     page.add(
         ft.Column(
             controls=[
                 ft.Row(
                     controls=[
-                        # 地方選択サイドバー
+                        #地方選択サイドバー
                         ft.Container(
                             content=nav_rail,
                             height=600,
                             bgcolor=ft.colors.BLACK12,
                             alignment=ft.alignment.top_center,
                         ),
-                        ft.VerticalDivider(width=1),  # 区切り線
-                        # 地域リストサイドバー
+                        ft.VerticalDivider(width=1),  #区切り線
+                        #地域リストサイドバー
                         ft.Container(
                             content=sidebar_content,
                             bgcolor=ft.colors.BLACK12,
@@ -218,8 +232,8 @@ def main(page: ft.Page):
                             width=250,
                             alignment=ft.alignment.top_left,
                         ),
-                        ft.VerticalDivider(width=1),  # 区切り線
-                        # 天気情報表示エリア
+                        ft.VerticalDivider(width=1),  #区切り線
+                        #天気情報表示エリア
                         ft.Container(
                             content=weather_container,
                             expand=True,
@@ -236,9 +250,9 @@ def main(page: ft.Page):
         )
     )
 
-    # 初期表示: 最初の地方を選択
+    #初期表示: 最初の地方を選択
     show_region_areas(0)
 
-# アプリケーションを実行
+#アプリケーションを実行
 if __name__ == "__main__":
     ft.app(target=main)
