@@ -49,25 +49,22 @@ def get_monorail_status():
 
 #データ取得:東京都の天気情報
 def get_weather():
-    area_id = "130000"
-    forecast_url = f"https://www.jma.go.jp/bosai/forecast/data/forecast/{area_id}.json"
+    forecast_url = "https://www.jma.go.jp/bosai/forecast/#area_type=offices&area_code=130000"
     try:
         response = requests.get(forecast_url)
         response.raise_for_status()
-        forecast_data = response.json()
-        today_date = datetime.now().strftime("%Y-%m-%d")
-        for area in forecast_data:
-            if "timeSeries" in area:
-                time_series = area["timeSeries"]
-                for series in time_series:
-                    if "areas" in series:
-                        for region in series["areas"]:
-                            if region["area"]["code"] == "130010":
-                                times = series["timeDefines"]
-                                weathers = region["weathers"]
-                                for i, time in enumerate(times):
-                                    if today_date in time:
-                                        return weathers[i]
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # "東京地方" 部分を検索する
+        tokyo_weather_section = soup.find('div', class_='forecast-point-name', string="東京地方")
+        if not tokyo_weather_section:
+            return "天気情報が見つかりません"
+
+        # "東京地方" に関連付けられた天気情報を取得
+        parent_div = tokyo_weather_section.find_parent('div', class_='forecast-table')
+        weather_info = parent_div.find('p', class_='weather-telop').text.strip()
+        return weather_info
+
     except Exception as e:
         return f"天気情報取得エラー: {e}"
 
